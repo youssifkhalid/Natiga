@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحويل ملفات Excel إلى JSON</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f0f4f8;
+            color: #2c3e50;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #3498db;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #3498db;
+            color: #ffffff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>تحويل ملفات Excel إلى JSON</h1>
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="firstGrade">ملف الصف الأول الثانوي:</label>
+                <input type="file" id="firstGrade" accept=".xlsx,.xls" required>
+            </div>
+            <div class="form-group">
+                <label for="secondGradeScientific">ملف الصف الثاني الثانوي (علمي):</label>
+                <input type="file" id="secondGradeScientific" accept=".xlsx,.xls" required>
+            </div>
+            <div class="form-group">
+                <label for="secondGradeLiterary">ملف الصف الثاني الثانوي (أدبي):</label>
+                <input type="file" id="secondGradeLiterary" accept=".xlsx,.xls" required>
+            </div>
+            <button type="submit">تحويل الملفات</button>
+        </form>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            processFiles();
+        });
+
+        function processFiles() {
+            const files = {
+                first: document.getElementById('firstGrade').files[0],
+                secondScientific: document.getElementById('secondGradeScientific').files[0],
+                secondLiterary: document.getElementById('secondGradeLiterary').files[0]
+            };
+
+            const results = {};
+
+            Object.entries(files).forEach(([grade, file]) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    results[grade] = processGradeData(json, grade);
+
+                    if (Object.keys(results).length === 3) {
+                        displayResults(results);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function processGradeData(data, grade) {
+            const processedData = {};
+
+            data.forEach(row => {
+                const studentId = row['رقم الجلوس'].toString();
+                const studentName = row['اسم الطالب'];
+                const scores = {};
+
+                Object.entries(row).forEach(([key, value]) => {
+                    if (key !== 'رقم الجلوس' && key !== 'اسم الطالب') {
+                        scores[key] = Number(value);
+                    }
+                });
+
+                processedData[studentId] = {
+                    name: studentName,
+                    scores: scores
+                };
+            });
+
+            return processedData;
+        }
+
+        function displayResults(results) {
+            const jsonOutput = JSON.stringify(results, null, 2);
+            document.getElementById('result').innerHTML = '<h3>تم التحويل بنجاح!</h3>';
+
+            // إنشاء روابط لتحميل الملفات JSON
+            Object.entries(results).forEach(([grade, data]) => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${grade}.json`;
+                link.textContent = `تحميل ملف JSON للصف ${getGradeName(grade)}`;
+                document.getElementById('result').appendChild(link);
+                document.getElementById('result').appendChild(document.createElement('br'));
+            });
+        }
+
+        function getGradeName(grade) {
+            switch(grade) {
+                case 'first': return 'الأول الثانوي';
+                case 'secondScientific': return 'الثاني الثانوي (علمي)';
+                case 'secondLiterary': return 'الثاني الثانوي (أدبي)';
+                default: return grade;
+            }
+        }
+    </script>
+</body>
+</html>
